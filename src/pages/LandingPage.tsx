@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Brand } from '../components/AppShell'
+import dramaIcon from '../assets/dramaIcon.png'
 import {
   BookmarkIcon, CheckIcon, CommentIcon, HeartIcon, PlayIcon,
   ReelsIcon, SearchIcon, ShareIcon, UserIcon, WalletIcon,
@@ -391,7 +392,7 @@ function AppTour({ header }: { header: ReactNode }) {
 
             {/* 1. sign up */}
             <div className={screen(0) + ' flex flex-col px-5 pt-14'}>
-              <span className="grid size-11 place-items-center rounded-2xl bg-[#24372C] text-sm font-bold text-[#E6E0D5]">DM</span>
+              <img src={dramaIcon} alt="" className="h-14 w-auto self-start object-contain" />
               <strong className="mt-5 text-lg">Welcome</strong>
               <span className="text-xs text-[#24372C]/60">Sign up with your mobile number</span>
               <span className="mt-5 rounded-xl border border-[#24372C]/15 bg-[#F4F1EA] px-3 py-2.5 text-sm"><span className="text-[#24372C]/50">+91 </span>98480 •••10</span>
@@ -598,7 +599,7 @@ export default function LandingPage() {
       {/* ================= HEADER ================= */}
       <header className="sticky top-0 z-50 px-3 pt-3 sm:px-5">
         <div className={'mx-auto max-w-6xl rounded-[1.75rem] border border-[#24372C]/10 bg-[#F4F1EA]/85 backdrop-blur-xl transition-shadow duration-300 ' + (scrolled ? 'shadow-[0_14px_40px_-18px_rgba(36,55,44,0.45)]' : '')}>
-          <div className="flex h-14 items-center justify-between gap-3 pl-4 pr-2 sm:pl-5">
+          <div className="flex h-16 items-center justify-between gap-3 pl-4 pr-2 sm:pl-5">
             <Brand to="/" />
             <nav aria-label="Landing navigation" className="hidden items-center gap-1 lg:flex">
               {navLinks.map(([id, label]) => (

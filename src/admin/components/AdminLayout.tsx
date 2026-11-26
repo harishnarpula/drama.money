@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import dramaIcon from '../../assets/dramaIcon.png'
+import dramaLogo from '../../assets/drama-logo.png'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../auth/AdminAuth'
 import { navGroups } from '../navigation'
@@ -63,10 +65,9 @@ export function AdminLayout() {
         className={`fixed inset-y-0 left-0 z-[91] flex h-dvh min-h-0 w-[min(290px,84vw)] flex-col overflow-hidden bg-[linear-gradient(165deg,#20382c_0%,#14251d_75%)] px-4 pt-[22px] pb-4 text-[#ECF3EE] shadow-[16px_0_45px_rgba(14,30,22,.24)] transition-[transform,visibility] duration-200 min-[761px]:static min-[761px]:z-auto min-[761px]:w-auto min-[761px]:translate-x-0 min-[761px]:visible min-[761px]:shadow-[16px_0_45px_rgba(14,30,22,.12)] ${sidebarCollapsed ? 'min-[761px]:px-[11px]' : 'min-[761px]:px-4'} ${menuOpen ? 'translate-x-0 visible' : '-translate-x-[105%] invisible'}`}
         aria-label="Admin navigation"
       >
-        <NavLink to="/admin/dashboard" className={`flex items-center gap-3 px-2 pb-5 text-inherit no-underline ${sidebarCollapsed ? 'min-[761px]:justify-center min-[761px]:px-0' : ''}`} onClick={() => setMenuPath(null)}>
-          <b className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[linear-gradient(145deg,#fff8e9,#cfdccf)] text-sm text-[#20382C] shadow-[0_10px_25px_rgba(0,0,0,.25)]">DM</b>
-          <span className={`text-[15px] font-[850] ${sidebarCollapsed ? 'min-[761px]:hidden' : ''}`}>
-            Drama.Money<small className="mt-0.5 block text-[9px] font-[550] uppercase tracking-[.06em] text-[#9CB0A4]">Control centre</small>
+        <NavLink to="/admin/dashboard" aria-label="Drama.Money control centre" className={`flex items-center gap-3 px-2 pb-5 text-inherit no-underline ${sidebarCollapsed ? 'min-[761px]:justify-center min-[761px]:px-0' : ''}`} onClick={() => setMenuPath(null)}>
+          <span className="inline-flex shrink-0 rounded-xl bg-[#F7F3E8] p-1.5 shadow-[0_10px_25px_rgba(0,0,0,.25)]">
+            <img src={sidebarCollapsed ? dramaIcon : dramaLogo} alt="" className={sidebarCollapsed ? 'h-10 w-auto' : 'h-10 w-auto max-w-[190px]'} />
           </span>
         </NavLink>
         <nav className={`grid min-h-0 flex-1 gap-[15px] overflow-x-hidden overflow-y-auto px-0.5 pb-2 [scrollbar-color:rgba(219,231,222,.38)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-thumb]:rounded-[10px] [&::-webkit-scrollbar-thumb]:bg-[rgba(219,231,222,.32)] [&::-webkit-scrollbar-thumb:hover]:bg-[rgba(219,231,222,.55)] ${sidebarCollapsed ? 'min-[761px]:justify-items-center min-[761px]:px-0' : ''}`}>

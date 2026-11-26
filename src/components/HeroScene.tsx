@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import dramaIcon from '../assets/dramaIcon.png'
 import * as THREE from 'three'
 
 function roundedPanel(width: number, height: number, radius: number, depth: number, color: number) {
@@ -306,7 +307,7 @@ export default function HeroScene() {
       role="img"
       aria-label="Interactive 3D world of skill videos, creator phones, career growth and verified content. Drag to rotate."
     >
-      <div className="absolute inset-0 -z-10 grid place-items-center" aria-hidden="true"><span className="grid size-16 place-items-center rounded-2xl bg-[#24372C] font-black text-white">DM</span></div>
+      <div className="absolute inset-0 -z-10 grid place-items-center" aria-hidden="true"><img src={dramaIcon} alt="" className="h-20 w-auto" /></div>
     </div>
   )
 }

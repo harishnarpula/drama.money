@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import dramaIcon from '../assets/dramaIcon.png'
+import dramaLogo from '../assets/drama-logo.png'
 import { useAuth } from '../auth/auth-context'
 import { BellIcon, ChartIcon, ChevronRight, CloseIcon, HomeIcon, LogOutIcon, MenuIcon, PlusIcon, ReelsIcon, SearchIcon, UserIcon, WalletIcon } from './Icons'
 
@@ -52,9 +54,13 @@ function SidebarLinks({ onSelect, compact = false }: { onSelect?: () => void; co
 
 export function Brand({ compact = false, to = '/app' }: { compact?: boolean; to?: string }) {
   return (
-    <NavLink to={to} className="inline-flex min-w-0 items-center gap-2.5 text-[#24372C] no-underline" aria-label="Drama.Money home" title="Drama.Money">
-      <span className="grid size-[38px] shrink-0 place-items-center rounded-[12px_12px_12px_4px] bg-[linear-gradient(145deg,#496353,#24372c_68%,#17251d)] font-black text-white shadow-[0_8px_24px_rgba(36,55,44,.2)]" aria-hidden="true">DM</span>
-      {!compact && <span className="min-w-0 truncate text-[19px] font-extrabold tracking-[-.7px]">Drama<span className="text-[#24372C]">.Money</span></span>}
+    <NavLink to={to} className="inline-flex min-w-0 items-center no-underline" aria-label="Drama.Money home" title="Drama.Money">
+      <img
+        src={compact ? dramaIcon : dramaLogo}
+        alt=""
+        aria-hidden="true"
+        className={compact ? 'h-[46px] w-auto shrink-0 object-contain' : 'h-12 w-auto max-w-[210px] shrink-0 object-contain max-[420px]:h-[34px] max-[320px]:h-7'}
+      />
     </NavLink>
   )
 }
@@ -105,7 +111,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className={`min-h-svh bg-[#F8F6F1] text-[#24372C] [--mobile-bottom:calc(62px+env(safe-area-inset-bottom))] [--mobile-top:calc(58px+env(safe-area-inset-top))] ${collapsed ? '[--sidebar-width:82px]' : '[--sidebar-width:280px]'} ${isReels ? 'max-[680px]:h-dvh max-[680px]:min-h-0 max-[680px]:overflow-hidden' : ''}`}>
+    <div className={`min-h-svh bg-[#F8F6F1] text-[#24372C] [--mobile-bottom:calc(62px+env(safe-area-inset-bottom))] [--mobile-top:calc(64px+env(safe-area-inset-top))] ${collapsed ? '[--sidebar-width:82px]' : '[--sidebar-width:280px]'} ${isReels ? 'max-[680px]:h-dvh max-[680px]:min-h-0 max-[680px]:overflow-hidden' : ''}`}>
       <aside className={`fixed inset-y-0 left-0 z-20 flex w-[var(--sidebar-width)] flex-col overflow-hidden border-r border-[#D8D2C8] bg-[#FBFAF6] py-[26px] pr-[18px] pb-5 pl-[18px] max-[680px]:hidden max-h-[720px]:min-[681px]:py-4 max-h-[720px]:min-[681px]:pb-3 ${collapsed ? 'items-center px-3' : ''}`} id="desktop-sidebar">
         <div className={`mb-6 flex items-center justify-between gap-[5px] max-h-[720px]:min-[681px]:mb-3 ${collapsed ? 'mb-[13px] flex-col gap-2' : ''}`}>
           <Brand compact={collapsed} />

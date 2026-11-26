@@ -12,6 +12,7 @@ import ReelsFeed from './pages/ReelsFeed'
 import { CreatorDashboardPage, EarningsPage, HomePage, NotificationsPage, ProfilePage, SearchPage } from './pages/AppPages'
 import UploadPage from './pages/UploadPage'
 import { SessionExpiredModal } from './components/SessionExpiredModal'
+import dramaIcon from './assets/dramaIcon.png'
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const AdminApp = lazy(() => import('./admin/AdminApp'))
@@ -35,11 +36,11 @@ function RootRedirect() {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]" aria-label="Loading Drama.Money 3D experience"><span className="grid size-14 place-items-center rounded-2xl bg-[#24372C] font-black text-white motion-safe:animate-pulse">DM</span></div>}><LandingPage /></Suspense>} />
+      <Route path="/" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]" aria-label="Loading Drama.Money 3D experience"><img src={dramaIcon} alt="" className="h-[72px] w-auto motion-safe:animate-pulse" /></div>}><LandingPage /></Suspense>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/admin/*" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]"><span className="grid size-14 place-items-center rounded-2xl bg-[#24372C] font-black text-white motion-safe:animate-pulse">DM</span></div>}><AdminApp /></Suspense>} />
+      <Route path="/admin/*" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]"><img src={dramaIcon} alt="" className="h-[72px] w-auto motion-safe:animate-pulse" /></div>}><AdminApp /></Suspense>} />
       <Route path="/app" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route index element={<HomePage />} />
         <Route path="reels" element={<ReelsFeed />} />
