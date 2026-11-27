@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../services/api'
 import type { ContentReviewDecision, PostStatus, ReelResponse } from '../../services/api'
@@ -21,7 +21,7 @@ export function ReelReviewPage() {
   const filter = params.get('status')
   const status = filter === 'ALL' ? undefined : filter === 'APPROVED' || filter === 'REJECTED' ? filter : 'PENDING'
 
-  return <ReelReviewQueue key={status ?? 'ALL'} filter={status} onFilterChange={(value) => setParams({ status: value ?? 'ALL' })} />
+  return <ReelReviewQueue filter={status} onFilterChange={(value) => setParams({ status: value ?? 'ALL' })} />
 }
 
 function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefined; onFilterChange: (filter: PostStatus | undefined) => void }) {
@@ -36,6 +36,7 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
   const [reason, setReason] = useState('')
   const [reviewError, setReviewError] = useState<{ id: string; message: string } | null>(null)
   const [notice, setNotice] = useState('')
+  const hasLoadedRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -43,8 +44,10 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
       if (!active) return
       setReels(result.content)
       setLast(result.last)
+      setLoadError('')
+      hasLoadedRef.current = true
     }).catch((cause: unknown) => {
-      if (!active) return
+      if (!active || hasLoadedRef.current) return
       setLoadError(cause instanceof ApiError && cause.status === 403
         ? 'This account does not have Reel Review permission. Sign in with an authorized admin account.'
         : cause instanceof Error ? cause.message : 'Please try again.')
@@ -55,9 +58,14 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
   }, [filter, page, refresh])
 
   function loadPage(nextPage: number) {
+    setLoadError('')
+    if (nextPage === page) setRefresh((value) => value + 1)
+    else setPage(nextPage)
+  }
+
+  function retryInitialLoad() {
     setLoading(true)
     setLoadError('')
-    setPage(nextPage)
     setRefresh((value) => value + 1)
   }
 
@@ -76,7 +84,17 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
       await api.moderation.review({ contentType: 'REEL', contentId: reelId, ...decision })
       resetRejection()
       setNotice(decision.status === 'APPROVED' ? 'Reel approved.' : 'Reel rejected.')
-      loadPage(0)
+      setReels((current) => current.flatMap((reel) => {
+        if (reel.id !== reelId) return [reel]
+        if (filter !== undefined && filter !== decision.status) return []
+        return [{
+          ...reel,
+          reelStatus: decision.status,
+          rejectionReason: decision.status === 'REJECTED' ? decision.rejectionReason.trim() : null,
+        }]
+      }))
+      // Reconcile pagination and server-calculated fields without replacing the page with a loader.
+      setRefresh((value) => value + 1)
     } catch (cause) {
       setReviewError({ id: reelId, message: cause instanceof Error ? cause.message : 'Could not save the review.' })
     } finally {
@@ -92,6 +110,8 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
             className={`${buttonClass} ${filter === value ? 'bg-[#24372C] text-white' : 'bg-white text-[#24372C] hover:bg-[#F1EEE7]'}`}
             onClick={() => {
               if (filter === value) return
+              setPage(0)
+              setLoadError('')
               onFilterChange(value)
             }}>{label}</button>
         ))}
@@ -106,7 +126,7 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
       ) : loadError ? (
         <div className="space-y-3 rounded-xl border border-[#EAC5C0] bg-[#FFF4F2] p-4">
           <p role="alert" className="text-sm text-[#842B24]">Could not load reels. {loadError}</p>
-          <button type="button" className={buttonClass} onClick={() => loadPage(page)}>Try again</button>
+          <button type="button" className={buttonClass} onClick={retryInitialLoad}>Try again</button>
         </div>
       ) : (
         <div className="space-y-4">
