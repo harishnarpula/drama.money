@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { CameraIcon, FilmReelIcon } from '../components/Icons'
+import { BookmarkIcon, CameraIcon, FilmReelIcon } from '../components/Icons'
 import { api } from '../services/api'
 import type { MediaPage } from '../services/api'
 import ProfilePost from './ProfilePost'
 import ProfileReel, { ReelViewer } from './ProfileReel'
+import ProfileSavedItem from './ProfileSavedItem'
 
 const mediaGridClass = 'grid grid-cols-2 items-start gap-3 @min-[760px]:grid-cols-3 @min-[760px]:gap-4'
-type MediaKind = 'posts' | 'reels'
+type MediaKind = 'posts' | 'reels' | 'saved'
 
 type ViewerControls<T> = {
   index: number
@@ -24,7 +25,7 @@ type ViewerControls<T> = {
 }
 
 function MediaLoading({ kind, hasItems }: { kind: MediaKind; hasItems: boolean }) {
-  const PreviewIcon = kind === 'posts' ? CameraIcon : FilmReelIcon
+  const PreviewIcon = kind === 'posts' ? CameraIcon : kind === 'reels' ? FilmReelIcon : BookmarkIcon
 
   return (
     <div role="status">
@@ -49,7 +50,7 @@ function MediaLoading({ kind, hasItems }: { kind: MediaKind; hasItems: boolean }
   )
 }
 
-function MediaList<T extends { id: string; userId: string }>({ userId, kind, active, list, renderItem, renderViewer }: {
+function MediaList<T extends { id: string; userId?: string }>({ userId, kind, active, list, renderItem, renderViewer }: {
   userId: string
   kind: MediaKind
   active: boolean
@@ -74,7 +75,7 @@ function MediaList<T extends { id: string; userId: string }>({ userId, kind, act
     let active = true
     list(page).then((response) => {
       if (!active) return
-      const owned = response.content.filter((item) => item.userId === userId)
+      const owned = kind === 'saved' ? response.content : response.content.filter((item) => item.userId === userId)
       setItems((current) => [...new Map([...current, ...owned].map((item) => [item.id, item])).values()])
       setLast(response.last)
     }).catch((cause: unknown) => {
@@ -151,8 +152,15 @@ function MediaList<T extends { id: string; userId: string }>({ userId, kind, act
       {error && <p role="alert" className="break-words text-center text-sm text-[#802923]">Could not load {kind}. {error}</p>}
       {!loading && !error && last && !items.length && (
         <div className="rounded-2xl border border-dashed border-[#D8D2C8] bg-white p-8 text-center">
-          <p className="text-sm text-[#46534B]">You haven’t published any {kind} yet.</p>
-          <Link className="mt-2 inline-block text-sm font-bold text-[#24372C] underline" to={kind === 'posts' ? '/app/upload' : '/app/upload?type=video'}>{kind === 'posts' ? 'Create a post' : 'Upload a video'}</Link>
+          <p className="text-sm text-[#46534B]">
+            {kind === 'saved' ? 'You haven’t saved any posts or reels yet.' : `You haven’t published any ${kind} yet.`}
+          </p>
+          <Link
+            className="mt-2 inline-block text-sm font-bold text-[#24372C] underline"
+            to={kind === 'saved' ? '/app' : kind === 'posts' ? '/app/upload' : '/app/upload?type=video'}
+          >
+            {kind === 'saved' ? 'Explore feed to save content' : kind === 'posts' ? 'Create a post' : 'Upload a video'}
+          </Link>
         </div>
       )}
       {!loading && error && (
@@ -186,6 +194,8 @@ export default function ProfileMedia({ userId, kind, skills }: { userId: string;
       {visited.has('reels') && <MediaList key="reels" userId={userId} kind="reels" active={kind === 'reels'} list={api.reels.list}
         renderItem={(reel, _update, _remove, open) => <ProfileReel reel={reel} onOpen={open} />}
         renderViewer={(reel, controls) => <ReelViewer reel={reel} skills={skills} {...controls} />} />}
+      {visited.has('saved') && <MediaList key="saved" userId={userId} kind="saved" active={kind === 'saved'} list={(page) => api.users.getSavedContent(page, 20)}
+        renderItem={(item, _update, remove) => <ProfileSavedItem item={item as any} onRemove={remove} />} />}
     </>
   )
 }

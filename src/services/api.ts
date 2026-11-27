@@ -58,6 +58,7 @@ export interface PostResponse {
   likesCount?: number
   commentsCount?: number
   likedByCurrentUser?: boolean
+  savedByCurrentUser?: boolean
 }
 
 export interface ReelResponse {
@@ -75,6 +76,21 @@ export interface ReelResponse {
   likesCount?: number
   commentsCount?: number
   likedByCurrentUser?: boolean
+  savedByCurrentUser?: boolean
+}
+
+export interface SavedContentItem {
+  id: string
+  contentId: string
+  contentType: 'POST' | 'REEL'
+  contentUrl?: string | null
+  coverUrl?: string | null
+  caption?: string | null
+  savedAt: string
+  creator?: ContentCreator | null
+  likesCount?: number
+  commentsCount?: number
+  savedByCurrentUser?: boolean
 }
 
 export interface CreateReelRequest {
@@ -691,6 +707,8 @@ export const api = {
     }),
     toggleLike: (postId: string) =>
       request<LikeToggleResponse>(`/api/posts/${encodeURIComponent(postId)}/likes/toggle`, { method: 'POST', auth: true }),
+    toggleSave: (postId: string) =>
+      request<{ saved: boolean; savesCount: number }>(`/api/posts/${encodeURIComponent(postId)}/save/toggle`, { method: 'POST', auth: true }),
     getLikes: (postId: string, page = 0, size = 50) =>
       request<LikesSummaryResponse>(`/api/posts/${encodeURIComponent(postId)}/likes?page=${page}&size=${size}`, { auth: true }),
     getComments: (postId: string, page = 0, size = 30) =>
@@ -746,6 +764,8 @@ export const api = {
     }),
     toggleLike: (reelId: string) =>
       request<LikeToggleResponse>(`/api/reels/${encodeURIComponent(reelId)}/likes/toggle`, { method: 'POST', auth: true }),
+    toggleSave: (reelId: string) =>
+      request<{ saved: boolean; savesCount: number }>(`/api/reels/${encodeURIComponent(reelId)}/save/toggle`, { method: 'POST', auth: true }),
     getLikes: (reelId: string, page = 0, size = 50) =>
       request<LikesSummaryResponse>(`/api/reels/${encodeURIComponent(reelId)}/likes?page=${page}&size=${size}`, { auth: true }),
     getComments: (reelId: string, page = 0, size = 30) =>
@@ -817,6 +837,15 @@ export const api = {
       request<void>(`/api/users/${encodeURIComponent(userId)}/follow`, { method: 'PUT', auth: true }),
     unfollow: (userId: string) =>
       request<void>(`/api/users/${encodeURIComponent(userId)}/un-follow`, { method: 'DELETE', auth: true }),
+    getFollowers: (userId: string, page = 0, size = 20) =>
+      request<MediaPage<ContentCreator>>(`/api/users/${encodeURIComponent(userId)}/followers?page=${page}&size=${size}`, { auth: true }),
+    getFollowing: (userId: string, page = 0, size = 20) =>
+      request<MediaPage<ContentCreator>>(`/api/users/${encodeURIComponent(userId)}/following?page=${page}&size=${size}`, { auth: true }),
+    getSavedContent: (page = 0, size = 20, type?: string) => {
+      const params = new URLSearchParams({ page: String(page), size: String(size) })
+      if (type) params.set('type', type)
+      return request<MediaPage<SavedContentItem>>(`/api/users/me/saved?${params}`, { auth: true })
+    },
     uploadProfileImage: (file: File) => {
       const body = new FormData()
       body.append('file', file)

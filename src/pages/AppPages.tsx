@@ -12,6 +12,7 @@ import loginHero from '../assets/login-hero.webp'
 import { api } from '../services/api'
 import type { ContentCreator } from '../services/api'
 import { FollowButton } from '../components/FollowButton'
+import { FollowListModal } from '../components/FollowListModal'
 
 const pageWrap = 'mx-auto w-full max-w-[1080px] px-[42px] pt-[38px] pb-20 max-[680px]:px-3.5 max-[680px]:pt-6 max-[680px]:pb-10'
 const pageTitle = 'mb-[30px] flex items-end justify-between max-[680px]:mb-[22px] [&_p]:m-0 [&_p]:text-[10px] [&_p]:font-black [&_p]:tracking-[.16em] [&_p]:text-[#24372C] [&_h1]:mt-1 [&_h1]:text-[34px] [&_h1]:tracking-[-.045em] max-[680px]:[&_h1]:text-[29px]'
@@ -293,9 +294,14 @@ export function ProfilePage() {
   const { user, profile, toggleSocialLink } = useAuth()
   const location = useLocation()
   const [profileParams, setProfileParams] = useSearchParams()
-  const activeTab = profileParams.get('tab') === 'reels' ? 'reels' : 'posts'
+  const tabParam = profileParams.get('tab')
+  const activeTab: 'posts' | 'reels' | 'saved' = tabParam === 'saved' ? 'saved' : tabParam === 'reels' ? 'reels' : 'posts'
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [followListModal, setFollowListModal] = useState<{ isOpen: boolean; type: 'FOLLOWERS' | 'FOLLOWING' }>({
+    isOpen: false,
+    type: 'FOLLOWERS',
+  })
   const initials = profile.name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('') || 'DM'
   const uploadNotice = (location.state as { uploadNotice?: string } | null)?.uploadNotice
 
@@ -374,14 +380,24 @@ export function ProfilePage() {
               <span className="font-extrabold text-[#1E2A23]">{profile.postsCount ?? 0}</span>
               <span className="text-[#657067]">posts</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-[#1E2A23]">{profile.followersCount ?? 0}</span>
+            <button
+              type="button"
+              onClick={() => setFollowListModal({ isOpen: true, type: 'FOLLOWERS' })}
+              className="flex items-center gap-1.5 hover:underline cursor-pointer group"
+              title="View followers"
+            >
+              <span className="font-extrabold text-[#1E2A23] group-hover:text-emerald-700">{profile.followersCount ?? 0}</span>
               <span className="text-[#657067]">followers</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-[#1E2A23]">{profile.followingCount ?? 0}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowListModal({ isOpen: true, type: 'FOLLOWING' })}
+              className="flex items-center gap-1.5 hover:underline cursor-pointer group"
+              title="View following"
+            >
+              <span className="font-extrabold text-[#1E2A23] group-hover:text-emerald-700">{profile.followingCount ?? 0}</span>
               <span className="text-[#657067]">following</span>
-            </div>
+            </button>
           </div>
 
           {/* Bio */}
@@ -609,8 +625,18 @@ export function ProfilePage() {
         </div>
       )}
 
+      {/* Followers & Following List Modal */}
+      {followListModal.isOpen && (
+        <FollowListModal
+          isOpen={followListModal.isOpen}
+          onClose={() => setFollowListModal((prev) => ({ ...prev, isOpen: false }))}
+          userId={profile.id || user?.id || ''}
+          type={followListModal.type}
+        />
+      )}
+
       {/* Tabs */}
-      <nav aria-label="Profile content" className="mt-6 flex justify-center gap-10 border-b border-[#D8D2C8]">
+      <nav aria-label="Profile content" className="mt-6 flex justify-center gap-8 sm:gap-10 border-b border-[#D8D2C8]">
         <button
           type="button"
           onClick={() => setProfileParams({})}
@@ -632,6 +658,17 @@ export function ProfilePage() {
         >
           <FilmReelIcon className="size-4" />
           <span>REELS</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setProfileParams({ tab: 'saved' })}
+          aria-pressed={activeTab === 'saved'}
+          className={`h-11 flex items-center gap-2 border-b-2 text-xs font-bold tracking-wider transition cursor-pointer ${
+            activeTab === 'saved' ? 'border-[#24372C] text-[#24372C]' : 'border-transparent text-[#657067] hover:text-[#24372C]'
+          }`}
+        >
+          <BookmarkIcon className="size-4" />
+          <span>SAVED</span>
         </button>
       </nav>
 

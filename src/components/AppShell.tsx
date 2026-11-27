@@ -160,7 +160,7 @@ export default function AppShell() {
         </div>
       </dialog>
 
-      <section className={`ml-[var(--sidebar-width)] min-h-svh min-w-0 max-[680px]:mx-0 max-[680px]:mt-[var(--mobile-top)] max-[680px]:mb-[var(--mobile-bottom)] ${isReels ? 'max-[680px]:h-[calc(100dvh-var(--mobile-top)-var(--mobile-bottom))] max-[680px]:min-h-0' : ''}`}>
+      <section className={`ml-[var(--sidebar-width)] min-h-svh min-w-0 max-[680px]:mx-0 max-[680px]:mt-[var(--mobile-top)] max-[680px]:mb-[var(--mobile-bottom)] ${isReels ? 'h-svh overflow-hidden max-[680px]:h-[calc(100dvh-var(--mobile-top)-var(--mobile-bottom))] max-[680px]:min-h-0' : ''}`}>
         <Outlet />
       </section>
 
@@ -172,10 +172,12 @@ export default function AppShell() {
         ))}
       </nav>
 
-      <NavLink to="/app/upload" className="fixed right-7 bottom-7 z-25 inline-flex h-[58px] min-w-[58px] items-center justify-center gap-2 rounded-[18px] border border-white/80 bg-[#24372C] px-[18px] text-xs font-[850] text-white no-underline shadow-[0_9px_26px_rgba(25,48,34,.3)] transition hover:-translate-y-[3px] hover:bg-[#365341] hover:shadow-[0_14px_30px_rgba(25,48,34,.34)] aria-[current=page]:bg-[#365341] max-[680px]:hidden [&_svg]:size-[23px] [&_svg]:[stroke-width:2.4]" aria-label="Create a post or upload a video">
-        <PlusIcon />
-        <span>Upload</span>
-      </NavLink>
+      {!isReels && (
+        <NavLink to="/app/upload" className="fixed right-7 bottom-7 z-25 inline-flex h-[58px] min-w-[58px] items-center justify-center gap-2 rounded-[18px] border border-white/80 bg-[#24372C] px-[18px] text-xs font-[850] text-white no-underline shadow-[0_9px_26px_rgba(25,48,34,.3)] transition hover:-translate-y-[3px] hover:bg-[#365341] hover:shadow-[0_14px_30px_rgba(25,48,34,.34)] aria-[current=page]:bg-[#365341] max-[680px]:hidden [&_svg]:size-[23px] [&_svg]:[stroke-width:2.4]" aria-label="Create a post or upload a video">
+          <PlusIcon />
+          <span>Upload</span>
+        </NavLink>
+      )}
 
       {showLogout && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-[rgba(19,29,23,.58)] p-5 backdrop-blur-[9px]" role="presentation" onMouseDown={(event) => {

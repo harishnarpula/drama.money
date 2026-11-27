@@ -66,7 +66,7 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
   const [liked, setLiked] = useState(reel.likedByCurrentUser ?? false)
   const [likesCount, setLikesCount] = useState(reel.likesCount ?? 0)
   const [commentsCount, setCommentsCount] = useState(reel.commentsCount ?? 0)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved] = useState(reel.savedByCurrentUser ?? false)
   const [progress, setProgress] = useState(0)
   const [captionExpanded, setCaptionExpanded] = useState(false)
 
@@ -152,7 +152,14 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setSaved((prev) => !prev)
+    const nextSaved = !saved
+    setSaved(nextSaved)
+    api.reels.toggleSave(reel.id).then((res) => {
+      setSaved(res.saved)
+    }).catch((err) => {
+      console.debug('Failed to sync reel save:', err)
+      setSaved(!nextSaved)
+    })
   }
 
   const creatorName = reel.creator ? `${reel.creator.firstName || ''} ${reel.creator.lastName || ''}`.trim() : 'Creator'
@@ -161,7 +168,7 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
 
   return (
     <article
-      className="relative mx-auto flex h-full max-h-[calc(100dvh-5.5rem)] w-full max-w-[430px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-black shadow-2xl ring-1 ring-white/10"
+      className="relative flex aspect-[9/16] h-[min(calc(100%-1rem),46rem)] max-h-[calc(100dvh-2rem)] w-auto max-w-[min(100%,440px)] shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-black shadow-2xl border border-black/20"
       aria-label={`Reel by @${username}`}
     >
       {/* Video Element */}
@@ -176,7 +183,7 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={handleTimeUpdate}
-        className="h-full w-full cursor-pointer object-cover"
+        className="h-full w-full cursor-pointer object-contain bg-black"
       />
 
       {/* Floating Big Heart on Double Tap */}
@@ -234,7 +241,7 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
             <h3 className="truncate text-sm font-bold leading-tight">{creatorName}</h3>
             <p className="truncate text-xs text-white/80">@{username}</p>
           </div>
-          <FollowButton creator={reel.creator} overlay />
+          <FollowButton creator={reel.creator || (reel.userId ? { userId: reel.userId, username: 'creator' } : null)} overlay />
         </div>
 
         {/* Caption */}
@@ -448,13 +455,13 @@ export default function ReelsFeed() {
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh-4.25rem)] w-full flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#F8FAF6_0%,#E4EAE3_55%,#D5DDD6_100%)]">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#F8F6F1]">
       {/* Top Header */}
-      <header className="absolute top-2 inset-x-0 z-30 flex items-center justify-between px-6 pointer-events-none">
+      <header className="absolute top-3 inset-x-0 z-30 flex items-center justify-between px-6 pointer-events-none">
         <h1 className="text-lg font-black tracking-wider text-[#17251D]">REELS</h1>
         <Link
           to="/app/upload?type=video"
-          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/80 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur shadow hover:bg-emerald-500"
+          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
         >
           <PlusIcon className="size-4" /> Upload
         </Link>
@@ -462,13 +469,10 @@ export default function ReelsFeed() {
 
       {/* Main Snap Scroller */}
       {loading ? (
-        <div role="status" className="relative mx-4 h-[min(78dvh,46rem)] w-[calc(100%_-_2rem)] max-w-[26rem] overflow-hidden rounded-[24px] bg-[#17251D] shadow-[0_24px_70px_rgba(23,37,29,.28)] ring-1 ring-white/50">
+        <div role="status" className="relative mx-auto aspect-[9/16] h-[min(calc(100%-1rem),46rem)] max-h-[calc(100dvh-2rem)] w-auto max-w-[min(100%,440px)] overflow-hidden rounded-[24px] border border-[#D8D2C8] bg-white shadow-md flex flex-col items-center justify-center gap-3">
           <span className="sr-only">Loading reels…</span>
-          <div className="absolute inset-0 bg-[linear-gradient(145deg,#263D30,#101A14)]" />
-          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/5 to-transparent" />
-          <div className="absolute left-4 top-5 flex items-center gap-2"><span className="size-8 animate-pulse rounded-full bg-white/15" /><span className="h-2.5 w-24 animate-pulse rounded-full bg-white/15" /></div>
-          <div className="absolute inset-0 grid place-items-center"><span className="grid size-16 place-items-center rounded-full border border-white/15 bg-white/10 backdrop-blur"><span className="size-7 rounded-full border-2 border-emerald-300/40 border-t-emerald-300 motion-safe:animate-spin" /></span></div>
-          <div className="absolute inset-x-4 bottom-6 space-y-2.5"><span className="block h-3 w-2/3 animate-pulse rounded-full bg-white/20" /><span className="block h-2.5 w-full animate-pulse rounded-full bg-white/10" /><span className="block h-2.5 w-4/5 animate-pulse rounded-full bg-white/10" /></div>
+          <span className="size-9 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" />
+          <p className="text-xs font-semibold text-[#526157]">Loading reels…</p>
         </div>
       ) : error ? (
         <div className="flex max-w-sm flex-col items-center justify-center gap-4 rounded-2xl border border-[#D8D2C8] bg-white/80 p-6 text-center text-[#24372C] shadow-lg backdrop-blur">
@@ -509,7 +513,7 @@ export default function ReelsFeed() {
           {reels.map((reel, index) => (
             <div
               key={reel.id}
-              className="grid h-full w-full snap-start snap-always place-items-center p-2 sm:p-4"
+              className="flex h-full w-full snap-start snap-always items-center justify-center p-2 sm:py-3 sm:px-4"
             >
               <ReelItem
                 reel={reel}

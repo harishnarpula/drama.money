@@ -56,7 +56,8 @@ function HomePost({ post }: { post: PostResponse }) {
   const [liked, setLiked] = useState(post.likedByCurrentUser ?? false)
   const [likesCount, setLikesCount] = useState(post.likesCount ?? 0)
   const [commentsCount, setCommentsCount] = useState(post.commentsCount ?? 0)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved] = useState(post.savedByCurrentUser ?? false)
+  const [saving, setSaving] = useState(false)
   const [showLikesModal, setShowLikesModal] = useState(false)
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
@@ -169,6 +170,7 @@ function HomePost({ post }: { post: PostResponse }) {
       if (width !== measuredWidthRef.current) measureCaption()
     })
     observer.observe(container)
+
     return () => {
       observer.disconnect()
       measuredWidthRef.current = 0
@@ -177,6 +179,21 @@ function HomePost({ post }: { post: PostResponse }) {
 
   const creatorInitials =
     (post.creator?.firstName ? post.creator.firstName[0] : post.creator?.username ? post.creator.username[0] : 'DM').toUpperCase()
+
+  const handleSave = () => {
+    if (saving) return
+    setSaving(true)
+    const nextSaved = !saved
+    setSaved(nextSaved)
+    api.posts.toggleSave(post.id).then((res) => {
+      setSaved(res.saved)
+    }).catch((err) => {
+      console.debug('Failed to sync post save:', err)
+      setSaved(!nextSaved)
+    }).finally(() => {
+      setSaving(false)
+    })
+  }
 
   return (
     <article style={mediaRatioStyle(ratio)} className="overflow-hidden rounded-2xl border border-[#E4E1DA] bg-white shadow-sm [--post-image-height:min(72dvh,40rem)]">
@@ -201,7 +218,7 @@ function HomePost({ post }: { post: PostResponse }) {
             )}
           </div>
         </div>
-        <FollowButton creator={post.creator} />
+        <FollowButton creator={post.creator || (post.userId ? { userId: post.userId, username: 'creator' } : null)} />
       </div>
 
       <PostImageCarousel images={images} className="bg-[#F4F2ED]" onCoverLoad={({ naturalWidth, naturalHeight }) => {
@@ -236,9 +253,10 @@ function HomePost({ post }: { post: PostResponse }) {
         </button>
         <button
           type="button"
-          onClick={() => setSaved(!saved)}
+          onClick={handleSave}
+          disabled={saving}
           aria-label={saved ? 'Remove Bookmark' : 'Save post'}
-          className={`ml-auto cursor-pointer transition hover:scale-110 ${saved ? 'text-amber-500' : 'text-[#24372C]'}`}
+          className={`ml-auto cursor-pointer transition hover:scale-110 ${saved ? 'text-amber-500' : 'text-[#24372C]'} ${saving ? 'opacity-60' : ''}`}
         >
           <BookmarkIcon className={`size-6 ${saved ? 'fill-current text-amber-500' : ''}`} />
         </button>
