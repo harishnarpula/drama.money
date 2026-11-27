@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../services/api'
+import { api, getStoredAuth } from '../services/api'
 import type { ReelResponse } from '../services/api'
+import type { MediaPage } from '../services/api'
+import { readPageCache, writePageCache } from '../services/pageCache'
 import {
   BookmarkIcon,
   CommentIcon,
@@ -14,6 +16,7 @@ import {
 import { ShareModal } from '../components/ShareModal'
 import { LikesModal } from '../components/LikesModal'
 import { CommentsDrawer } from '../components/CommentsDrawer'
+import { FollowButton } from '../components/FollowButton'
 
 function VolumeHighIcon({ className = 'size-5' }: { className?: string }) {
   return (
@@ -227,10 +230,11 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
               avatarInitials
             )}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-bold leading-tight">{creatorName}</h3>
             <p className="truncate text-xs text-white/80">@{username}</p>
           </div>
+          <FollowButton creator={reel.creator} overlay />
         </div>
 
         {/* Caption */}
@@ -378,8 +382,11 @@ function ReelItem({ reel, isActive, isMuted, toggleMute }: ReelItemProps) {
 }
 
 export default function ReelsFeed() {
-  const [reels, setReels] = useState<ReelResponse[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheOwner = getStoredAuth()?.user.id ?? 'anonymous'
+  const cacheKey = `user:${cacheOwner}:reels:0`
+  const [cachedPage] = useState(() => readPageCache<MediaPage<ReelResponse>>(cacheKey))
+  const [reels, setReels] = useState<ReelResponse[]>(() => (cachedPage?.content ?? []).filter((reel) => !reel.reelStatus || reel.reelStatus === 'APPROVED'))
+  const [loading, setLoading] = useState(!cachedPage)
   const [error, setError] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(true)
@@ -394,13 +401,14 @@ export default function ReelsFeed() {
         (r) => !r.reelStatus || r.reelStatus === 'APPROVED'
       )
       setReels(approvedOnly)
+      writePageCache(cacheKey, data)
     } catch (err) {
       console.error('Failed to load approved reels:', err)
       setError(err instanceof Error ? err.message : 'Could not load reels.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [cacheKey])
 
   useEffect(() => {
     let active = true
@@ -412,11 +420,13 @@ export default function ReelsFeed() {
           (r) => !r.reelStatus || r.reelStatus === 'APPROVED'
         )
         setReels(approvedOnly)
+        setError('')
+        writePageCache(cacheKey, data)
       })
       .catch((err) => {
         if (!active) return
         console.error('Failed to load approved reels:', err)
-        setError(err instanceof Error ? err.message : 'Could not load reels.')
+        if (!cachedPage) setError(err instanceof Error ? err.message : 'Could not load reels.')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -425,7 +435,7 @@ export default function ReelsFeed() {
     return () => {
       active = false
     }
-  }, [])
+  }, [cacheKey, cachedPage])
 
   // Scroll active slide detection
   const handleScroll = () => {
@@ -438,10 +448,10 @@ export default function ReelsFeed() {
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh-4.25rem)] w-full flex-col items-center justify-center overflow-hidden bg-[#18231C]">
+    <div className="relative flex h-[calc(100dvh-4.25rem)] w-full flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#F8FAF6_0%,#E4EAE3_55%,#D5DDD6_100%)]">
       {/* Top Header */}
       <header className="absolute top-2 inset-x-0 z-30 flex items-center justify-between px-6 pointer-events-none">
-        <h1 className="text-lg font-black tracking-wider text-white drop-shadow">REELS</h1>
+        <h1 className="text-lg font-black tracking-wider text-[#17251D]">REELS</h1>
         <Link
           to="/app/upload?type=video"
           className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/80 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur shadow hover:bg-emerald-500"
@@ -452,13 +462,17 @@ export default function ReelsFeed() {
 
       {/* Main Snap Scroller */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center gap-3 text-white">
-          <div className="size-10 rounded-full border-4 border-emerald-400 border-t-transparent motion-safe:animate-spin" />
-          <p className="text-sm font-semibold tracking-wide text-white/80">Loading reels...</p>
+        <div role="status" className="relative mx-4 h-[min(78dvh,46rem)] w-[calc(100%_-_2rem)] max-w-[26rem] overflow-hidden rounded-[24px] bg-[#17251D] shadow-[0_24px_70px_rgba(23,37,29,.28)] ring-1 ring-white/50">
+          <span className="sr-only">Loading reels…</span>
+          <div className="absolute inset-0 bg-[linear-gradient(145deg,#263D30,#101A14)]" />
+          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/5 to-transparent" />
+          <div className="absolute left-4 top-5 flex items-center gap-2"><span className="size-8 animate-pulse rounded-full bg-white/15" /><span className="h-2.5 w-24 animate-pulse rounded-full bg-white/15" /></div>
+          <div className="absolute inset-0 grid place-items-center"><span className="grid size-16 place-items-center rounded-full border border-white/15 bg-white/10 backdrop-blur"><span className="size-7 rounded-full border-2 border-emerald-300/40 border-t-emerald-300 motion-safe:animate-spin" /></span></div>
+          <div className="absolute inset-x-4 bottom-6 space-y-2.5"><span className="block h-3 w-2/3 animate-pulse rounded-full bg-white/20" /><span className="block h-2.5 w-full animate-pulse rounded-full bg-white/10" /><span className="block h-2.5 w-4/5 animate-pulse rounded-full bg-white/10" /></div>
         </div>
       ) : error ? (
-        <div className="flex max-w-sm flex-col items-center justify-center gap-4 rounded-2xl bg-white/10 p-6 text-center text-white backdrop-blur">
-          <p className="text-sm text-rose-200">{error}</p>
+        <div className="flex max-w-sm flex-col items-center justify-center gap-4 rounded-2xl border border-[#D8D2C8] bg-white/80 p-6 text-center text-[#24372C] shadow-lg backdrop-blur">
+          <p className="text-sm text-[#842B24]">{error}</p>
           <button
             type="button"
             onClick={loadReels}
@@ -468,13 +482,13 @@ export default function ReelsFeed() {
           </button>
         </div>
       ) : reels.length === 0 ? (
-        <div className="flex max-w-md flex-col items-center justify-center gap-4 rounded-3xl border border-white/15 bg-white/5 p-8 text-center text-white backdrop-blur">
+        <div className="flex max-w-md flex-col items-center justify-center gap-4 rounded-3xl border border-[#D8D2C8] bg-white/75 p-8 text-center text-[#24372C] shadow-lg backdrop-blur">
           <div className="grid size-16 place-items-center rounded-2xl bg-emerald-500/20 text-emerald-400">
             <FilmReelIcon className="size-8" />
           </div>
           <div>
             <h2 className="text-xl font-bold">No approved reels yet</h2>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-[#657067]">
               Be the first creator to upload a short career or skill guidance video!
             </p>
           </div>

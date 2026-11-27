@@ -2,12 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PostImageCarousel from '../components/PostImageCarousel'
 import { BookmarkIcon, CameraIcon, CommentIcon, HeartIcon, ShareIcon } from '../components/Icons'
-import { api } from '../services/api'
+import { api, getStoredAuth } from '../services/api'
 import type { PostResponse } from '../services/api'
+import type { MediaPage } from '../services/api'
+import { readPageCache, writePageCache } from '../services/pageCache'
 import { mediaRatioStyle } from './profileMediaLayout'
 import { ShareModal } from '../components/ShareModal'
 import { LikesModal } from '../components/LikesModal'
 import { CommentsDrawer } from '../components/CommentsDrawer'
+import { FollowButton } from '../components/FollowButton'
 
 function PostSkeleton() {
   return (
@@ -198,6 +201,7 @@ function HomePost({ post }: { post: PostResponse }) {
             )}
           </div>
         </div>
+        <FollowButton creator={post.creator} />
       </div>
 
       <PostImageCarousel images={images} className="bg-[#F4F2ED]" onCoverLoad={({ naturalWidth, naturalHeight }) => {
@@ -341,27 +345,32 @@ export default function HomePosts({
   filter?: string
   onResetFilter?: () => void
 } = {}) {
-  const [posts, setPosts] = useState<PostResponse[]>([])
+  const cacheOwner = getStoredAuth()?.user.id ?? 'anonymous'
+  const cacheKey = `user:${cacheOwner}:home-posts:0`
+  const [cachedPage] = useState(() => readPageCache<MediaPage<PostResponse>>(cacheKey))
+  const [posts, setPosts] = useState<PostResponse[]>(() => (cachedPage?.content ?? []).filter((post) => post.postStatus == null || post.postStatus === 'APPROVED'))
   const [page, setPage] = useState(0)
   const [retry, setRetry] = useState(0)
-  const [last, setLast] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [last, setLast] = useState(cachedPage?.last ?? false)
+  const [loading, setLoading] = useState(!cachedPage)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
-    api.posts.listApproved(page).then(({ content, last }) => {
+    api.posts.listApproved(page).then((response) => {
       if (!active) return
-      const approved = content.filter((post) => post.postStatus == null || post.postStatus === 'APPROVED')
-      setPosts((current) => [...new Map([...current, ...approved].map((post) => [post.id, post])).values()])
-      setLast(last)
+      const approved = response.content.filter((post) => post.postStatus == null || post.postStatus === 'APPROVED')
+      setPosts((current) => page === 0 ? approved : [...new Map([...current, ...approved].map((post) => [post.id, post])).values()])
+      setLast(response.last)
+      setError('')
+      if (page === 0) writePageCache(cacheKey, response)
     }).catch((cause: unknown) => {
-      if (active) setError(cause instanceof Error ? cause.message : 'Please try again.')
+      if (active && (page > 0 || !cachedPage)) setError(cause instanceof Error ? cause.message : 'Please try again.')
     }).finally(() => {
       if (active) setLoading(false)
     })
     return () => { active = false }
-  }, [page, retry])
+  }, [cacheKey, cachedPage, page, retry])
 
   function loadMore() {
     setLoading(true)

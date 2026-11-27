@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/auth-context'
-import { feedPosts, notifications, stories } from '../data/mockData'
+import { feedPosts, notifications } from '../data/mockData'
 import { useVideos } from '../data/videoStore'
 import { BellIcon, BookmarkIcon, CameraIcon, ChevronRight, CommentIcon, ExternalLinkIcon, FilmReelIcon, HeartIcon, PlatformIcon, PlayIcon, PlusIcon, SearchIcon, ShareIcon, Share2Icon, WalletIcon } from '../components/Icons'
 import ProfileMedia from './ProfileMedia'
 import ProfilePhotoPicker from '../components/ProfilePhotoPicker'
 import HomePosts from './HomePosts'
 import loginHero from '../assets/login-hero.webp'
+import { api } from '../services/api'
+import type { ContentCreator } from '../services/api'
+import { FollowButton } from '../components/FollowButton'
 
 const pageWrap = 'mx-auto w-full max-w-[1080px] px-[42px] pt-[38px] pb-20 max-[680px]:px-3.5 max-[680px]:pt-6 max-[680px]:pb-10'
 const pageTitle = 'mb-[30px] flex items-end justify-between max-[680px]:mb-[22px] [&_p]:m-0 [&_p]:text-[10px] [&_p]:font-black [&_p]:tracking-[.16em] [&_p]:text-[#24372C] [&_h1]:mt-1 [&_h1]:text-[34px] [&_h1]:tracking-[-.045em] max-[680px]:[&_h1]:text-[29px]'
@@ -18,11 +21,6 @@ const reelTone: Record<string, string> = {
   indigo: 'bg-[linear-gradient(145deg,#8a7f6f,#394a40)]',
   coral: 'bg-[linear-gradient(145deg,#b2a792,#24372c)]',
 }
-const exploreTone = [
-  'bg-[linear-gradient(145deg,#b2a792,#24372c)]',
-  'bg-[linear-gradient(145deg,#617967,#24372c)]',
-  'bg-[linear-gradient(145deg,#8a7f6f,#394a40)]',
-]
 const videoStatusTone: Record<string, string> = {
   Live: 'bg-[#E9F7F5] text-[#4D6B5B]',
   'In review': 'bg-[#FFF4D6] text-[#8A6418]',
@@ -178,18 +176,73 @@ export function ReelsPage() {
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState('For you')
-  const items = Array.from({ length: 9 }, (_, index) => ({ title: ['Interview answers', 'Excel in 30 sec', 'Resume checklist', 'Campus placement', 'Java basics', 'Group discussion', 'Bank exam plan', 'LinkedIn profile', 'English confidence'][index], category: stories[index % stories.length].name }))
+  const [results, setResults] = useState<ContentCreator[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) return
+
+    let active = true
+    const timer = window.setTimeout(() => {
+      setLoading(true)
+      setError('')
+      api.users.search(term, 0, 20).then(async (page) => {
+        const creators = await Promise.all(page.content.map(async (result) => {
+          try {
+            return await api.users.getProfile(result.userId)
+          } catch {
+            return {
+              ...result,
+              firstName: result.firstName ?? undefined,
+              lastName: result.lastName ?? undefined,
+              followStatus: null,
+            } satisfies ContentCreator
+          }
+        }))
+        if (active) setResults(creators)
+      }).catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : 'Could not search creators.')
+      }).finally(() => {
+        if (active) setLoading(false)
+      })
+    }, 350)
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [query])
+
   return (
-    <div className={pageWrap}>
+    <div className={`${pageWrap} max-w-[820px]`}>
       <header className={pageTitle}><div><p>EXPLORE</p><h1>Search</h1></div></header>
-      <label className="flex h-[52px] items-center gap-2.5 rounded-xl border border-[#D8D2C8] bg-[#F1EEE7] px-[15px] [&_svg]:w-5 [&_svg]:text-[#657067]"><SearchIcon /><input className="min-w-0 flex-1 border-0 bg-transparent outline-0" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search videos, skills or creators" /></label>
-      <div className="my-[18px] mb-[25px] flex gap-2 overflow-x-auto">{['For you', 'Jobs', 'Interviews', 'Skills', 'Government exams', 'Freshers'].map((item) => <button key={item} type="button" className={`shrink-0 rounded-full border px-3 py-2 text-[9px] ${item === activeFilter ? 'border-[#24372C] bg-[#24372C] text-white' : 'border-[#D8D2C8] bg-white'}`} onClick={() => setActiveFilter(item)}>{item}</button>)}</div>
-      <div className="grid grid-cols-3 gap-[3px] max-[680px]:gap-0.5">{items.filter((item) => {
-        const matchesQuery = item.title.toLowerCase().includes(query.toLowerCase()) || item.category.toLowerCase().includes(query.toLowerCase())
-        const matchesFilter = activeFilter === 'For you' || item.category.toLowerCase().includes(activeFilter.toLowerCase().replace('government exams', 'government'))
-        return matchesQuery && matchesFilter
-      }).map((item, index) => <article key={item.title} className={`relative flex aspect-[4/5] flex-col justify-end overflow-hidden p-[15px] text-white max-[680px]:p-[9px] [&>svg]:absolute [&>svg]:top-[13px] [&>svg]:right-[13px] [&>svg]:w-[18px] ${exploreTone[index % 3]}`}><PlayIcon /><span className="text-[7px] font-[850] uppercase">{item.category}</span><h2 className="my-[5px] text-[15px] leading-[1.2] max-[680px]:text-[11px]">{item.title}</h2><small className="text-[8px]">{(index + 2) * 1.7}K views</small></article>)}</div>
+      <label className="flex h-[52px] items-center gap-2.5 rounded-xl border border-[#D8D2C8] bg-[#F1EEE7] px-[15px] focus-within:border-[#6E8174] focus-within:ring-2 focus-within:ring-[#DDE6DF] [&_svg]:w-5 [&_svg]:text-[#657067]"><SearchIcon /><input className="min-w-0 flex-1 border-0 bg-transparent outline-0" value={query} onChange={(event) => {
+        const value = event.target.value
+        setQuery(value)
+        if (value.trim().length < 2) {
+          setResults([])
+          setLoading(false)
+          setError('')
+        }
+      }} placeholder="Search creators by name or username" autoComplete="off" /></label>
+
+      <div className="mt-5 space-y-3" aria-live="polite">
+        {query.trim().length < 2 && <p className="rounded-xl border border-dashed border-[#CFC9BD] bg-white/60 p-6 text-center text-sm text-[#657067]">Enter at least two characters to find creators.</p>}
+        {loading && [0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-[#E2DED5] bg-white p-4"><span className="size-12 shrink-0 animate-pulse rounded-full bg-[#E4E8E2]" /><span className="flex-1 space-y-2"><span className="block h-3 w-36 animate-pulse rounded bg-[#E4E8E2]" /><span className="block h-2.5 w-24 animate-pulse rounded bg-[#EEECE6]" /></span></div>)}
+        {!loading && error && <p role="alert" className="rounded-xl border border-[#EAC5C0] bg-[#FFF4F2] p-4 text-sm text-[#842B24]">{error}</p>}
+        {!loading && !error && query.trim().length >= 2 && results.length === 0 && <p className="rounded-xl border border-[#D8D2C8] bg-white p-6 text-center text-sm text-[#657067]">No creators found for “{query.trim()}”.</p>}
+        {!loading && results.map((creator) => {
+          const name = [creator.firstName, creator.lastName].filter(Boolean).join(' ') || creator.username
+          const initials = name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+          return <article key={creator.userId} className="flex items-center gap-3 rounded-xl border border-[#E2DED5] bg-white p-3.5 shadow-sm">
+            <Avatar initials={initials} src={creator.profileUrl || undefined} className="size-12" />
+            <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold text-[#1E2A23]">{name}</h2><p className="truncate text-xs text-[#657067]">@{creator.username}</p></div>
+            <FollowButton creator={creator} />
+          </article>
+        })}
+      </div>
     </div>
   )
 }
@@ -238,11 +291,13 @@ export function EarningsPage() {
 
 export function ProfilePage() {
   const { user, profile, toggleSocialLink } = useAuth()
+  const location = useLocation()
   const [profileParams, setProfileParams] = useSearchParams()
   const activeTab = profileParams.get('tab') === 'reels' ? 'reels' : 'posts'
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const initials = profile.name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('') || 'DM'
+  const uploadNotice = (location.state as { uploadNotice?: string } | null)?.uploadNotice
 
   const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/app/profile` : 'https://drama.money/app/profile'
   const shareText = encodeURIComponent(`Check out ${profile.name}'s profile on Drama.Money: ${profileUrl}`)
@@ -283,6 +338,7 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 antialiased">
+      {uploadNotice && <p role="status" className="mb-4 rounded-xl border border-[#BFD7C5] bg-[#E2F1E6] px-4 py-3 text-sm font-semibold text-[#235437]">{uploadNotice} You can track its moderation status below.</p>}
       {/* Profile Header Card */}
       <section className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-8 rounded-3xl border border-[#D8D2C8] bg-white p-4 sm:p-8 shadow-sm">
         <ProfilePhotoPicker />

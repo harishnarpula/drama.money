@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, MouseEvent as ReactMouseEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/auth-context'
 import { CameraIcon, CloseIcon, FilmReelIcon, PlayIcon, PlusIcon } from '../components/Icons'
 import { api } from '../services/api'
 import type { MediaUpload, UploadMediaType } from '../services/api'
+import { clearPageCache } from '../services/pageCache'
 
 // Brand palette: cream #E6E0D5, forest green #24372C
 const imageAccept = '.jpg,.jpeg,.png,image/jpeg,image/png'
@@ -76,6 +77,7 @@ function PreviewTile({ image, index, busy, onRemove }: { image: MediaUpload; ind
 
 function ImagePostForm() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
   const [images, setImages] = useState<MediaUpload[]>([])
   const [caption, setCaption] = useState('')
@@ -154,7 +156,10 @@ function ImagePostForm() {
       setCaption('')
       setHashtags('')
       setUploadErrors([])
-      setSuccess(post.postStatus === 'PENDING' ? 'Post submitted for review.' : 'Post submitted.')
+      const message = post.postStatus === 'PENDING' ? 'Post submitted for review.' : 'Post submitted.'
+      setSuccess(message)
+      clearPageCache(`user:${user.id}:home-posts:0`)
+      navigate('/app/profile?tab=posts', { replace: true, state: { uploadNotice: message } })
     } catch (error) {
       setPublishError(error instanceof Error ? error.message : 'Could not publish the post. Please try again.')
     } finally {
@@ -337,6 +342,7 @@ function ReelUploadAnimation() {
 
 function ReelUploadForm() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const videoInput = useRef<HTMLInputElement>(null)
   const coverInput = useRef<HTMLInputElement>(null)
   const [video, setVideo] = useState<ReelFile | null>(null)
@@ -410,7 +416,10 @@ function ReelUploadForm() {
       setCover(null)
       setCaption('')
       setHashtags('')
-      setSuccess(reel.reelStatus === 'PENDING' ? 'Reel submitted for review.' : 'Reel submitted.')
+      const message = reel.reelStatus === 'PENDING' ? 'Reel submitted for review.' : 'Reel submitted.'
+      setSuccess(message)
+      clearPageCache(`user:${user.id}:reels:0`)
+      navigate('/app/profile?tab=reels', { replace: true, state: { uploadNotice: message } })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not submit the reel. Please try again.')
     } finally {

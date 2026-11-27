@@ -42,7 +42,9 @@ function ReelViewerContent({ reel, skills, index, count, previous, next, loading
   const [playback, setPlayback] = useState<Playback>()
   const [failedAttempt, setFailedAttempt] = useState<number>()
   const [videoRatio, setVideoRatio] = useState<number>()
-  const ratio = videoRatio ?? 16 / 9
+  // Reels are portrait-first. Metadata replaces this immediately for landscape or square uploads.
+  const ratio = videoRatio ?? 9 / 16
+  const orientation = ratio > 1.15 ? 'landscape' : ratio < 0.85 ? 'portrait' : 'square'
   const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -169,7 +171,7 @@ function ReelViewerContent({ reel, skills, index, count, previous, next, loading
   }
 
   return (
-    <dialog ref={dialogRef} aria-label="Reel viewer" className="fixed inset-0 m-auto h-[min(94dvh,48rem)] max-h-none w-[min(97vw,72rem)] max-w-none flex-col overflow-hidden rounded-2xl bg-white text-[#24372C] shadow-xl open:flex backdrop:bg-black/70 md:h-[min(92dvh,54rem)]" onCancel={(event) => {
+    <dialog ref={dialogRef} aria-label="Reel viewer" className={`fixed inset-0 m-auto h-[min(94dvh,48rem)] max-h-none w-[min(97vw,72rem)] max-w-none flex-col overflow-hidden rounded-2xl bg-white text-[#24372C] shadow-2xl open:flex backdrop:bg-black/75 md:h-[min(92dvh,54rem)] md:min-w-[42rem] ${orientation === 'portrait' ? 'md:w-[min(96vw,48rem)]' : orientation === 'square' ? 'md:w-[min(96vw,66rem)]' : 'md:w-[min(96vw,88rem)]'}`} onCancel={(event) => {
       event.preventDefault()
       if (busy) return
       if (mode === 'view') onClose()
@@ -200,7 +202,7 @@ function ReelViewerContent({ reel, skills, index, count, previous, next, loading
           <button type="button" aria-label="Close reel" className={mediaDialogCloseClass} disabled={busy} onClick={onClose}><CloseIcon className="size-5" /></button>
         </div>
       </header>
-      <div className="grid min-h-0 min-w-0 flex-1 content-start overflow-y-auto overscroll-contain md:grid-cols-[clamp(15rem,24vw,20rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden">
+      <div className="grid min-h-0 min-w-0 flex-1 content-start overflow-y-auto overscroll-contain md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden">
         <section className="min-w-0 space-y-3 p-4 [overflow-wrap:anywhere] sm:p-5 md:min-h-0 md:overflow-y-auto" aria-label="Reel details">
           {reel.reelStatus && <MediaStatusBadge status={reel.reelStatus} />}
           {reel.lifecycleStatus === 'ARCHIVED' && (
@@ -239,8 +241,8 @@ function ReelViewerContent({ reel, skills, index, count, previous, next, loading
           <p role="status" className="text-sm font-semibold empty:hidden">{message}</p>
         </section>
 
-        <div ref={stageRef} tabIndex={canBrowse ? 0 : undefined} role="group" aria-label={canBrowse ? 'Reel video. Use the up or down arrow to browse.' : 'Reel video'}
-          className={`order-first h-[min(55dvh,30rem)] min-h-0 min-w-0 place-items-center overflow-hidden bg-[#172D25] [container-type:size] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white md:order-none md:h-full ${mode === 'view' ? 'grid' : 'hidden md:grid'} ${canBrowse ? 'touch-pan-x touch-pinch-zoom' : ''}`}
+        <div ref={stageRef} tabIndex={canBrowse ? 0 : undefined} role="group" aria-label={`${orientation} reel video${canBrowse ? '. Use the up or down arrow to browse.' : ''}`}
+          className={`relative isolate order-first h-[min(55dvh,30rem)] min-h-0 min-w-0 place-items-center overflow-hidden border-[#EAE7DF] bg-[#0D110F] [container-type:size] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white md:order-none md:h-full md:border-s ${mode === 'view' ? 'grid' : 'hidden md:grid'} ${canBrowse ? 'touch-pan-x touch-pinch-zoom' : ''}`}
           onKeyDown={(event) => {
             if (!canBrowse || event.target !== event.currentTarget) return
             const navigate = event.key === 'ArrowDown' ? next : event.key === 'ArrowUp' ? previous : undefined
@@ -265,18 +267,24 @@ function ReelViewerContent({ reel, skills, index, count, previous, next, loading
             if (dy < 0) next?.()
             else previous?.()
           }}>
+          {(source?.coverUrl || reel.coverUrl) && (
+            <>
+              <img aria-hidden="true" src={source?.coverUrl || reel.coverUrl || undefined} alt="" className="pointer-events-none absolute inset-0 -z-10 size-full scale-110 object-cover opacity-25 blur-3xl" />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-black/55" />
+            </>
+          )}
           {playbackFailed ? (
-            <div role="alert" className="space-y-3 p-4 text-center text-sm text-white">
+            <div role="alert" className="relative z-10 space-y-3 p-4 text-center text-sm text-white">
               <p>This reel couldn’t play.</p>
               <button type="button" className="rounded-lg bg-white px-3 py-2 font-semibold text-[#24372C]" onClick={() => setAttempt((value) => value + 1)}>Retry video</button>
             </div>
           ) : source ? (
-            <video ref={playerRef} key={`${source.attempt}:${source.videoUrl}`} src={source.videoUrl} poster={source.coverUrl || undefined} aria-label={reel.caption || 'Profile reel'} controls playsInline preload="metadata" className="block max-h-full max-w-full object-contain" style={{ aspectRatio: ratio, width: `min(100%, calc(100cqh * ${ratio}))` }} onLoadedMetadata={(event) => readVideoRatio(event.currentTarget, setVideoRatio)} onError={() => {
+            <video ref={playerRef} key={`${source.attempt}:${source.videoUrl}`} src={source.videoUrl} poster={source.coverUrl || undefined} aria-label={reel.caption || 'Profile reel'} controls playsInline preload="metadata" className="relative z-10 block size-full object-contain" onLoadedMetadata={(event) => readVideoRatio(event.currentTarget, setVideoRatio)} onError={() => {
               if (attempt === 0) setAttempt(1)
               else setFailedAttempt(attempt)
             }} />
           ) : (
-            <p role="status" className="flex items-center gap-2 p-4 text-sm text-white">
+            <p role="status" className="relative z-10 flex items-center gap-2 rounded-full bg-black/30 px-4 py-2 text-sm text-white backdrop-blur-sm">
               <span aria-hidden="true" className="size-4 rounded-full border-2 border-white/40 border-t-white motion-safe:animate-spin" />
               Loading video…
             </p>
@@ -303,7 +311,7 @@ export default function ProfileReel({ reel, onOpen }: { reel: ReelResponse; onOp
         {poster ? (
           <img src={poster} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" onError={() => setFailedPoster(poster)} />
         ) : (
-          <video aria-hidden="true" src={reel.videoUrl} preload="metadata" muted playsInline className="pointer-events-none absolute inset-0 size-full bg-[#172D25] object-contain" onLoadedMetadata={({ currentTarget }) => {
+          <video aria-hidden="true" src={reel.videoUrl} preload="metadata" muted playsInline className="pointer-events-none absolute inset-0 size-full bg-[#0D110F] object-contain" onLoadedMetadata={({ currentTarget }) => {
             if (Number.isFinite(currentTarget.duration) && currentTarget.duration > 0) {
               currentTarget.currentTime = Math.min(0.08, currentTarget.duration / 2)
             }

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import PostImageCarousel from '../../components/PostImageCarousel'
-import { api, ApiError } from '../../services/api'
-import type { ContentReviewDecision, PostResponse, PostStatus } from '../../services/api'
+import { api, ApiError, getStoredAdminAuth } from '../../services/api'
+import type { ContentReviewDecision, MediaPage, PostResponse, PostStatus } from '../../services/api'
+import { readPageCache, writePageCache } from '../../services/pageCache'
 import { AdminPage } from '../components/AdminPageUI'
 import { generateAiReviewReport } from '../../services/aiModerator'
 import { AiModerationCard } from '../components/AiModerationCard'
+import { UploaderIdentity } from '../components/UploaderIdentity'
 
 const filters = [
   { label: 'Pending', value: 'PENDING' },
@@ -45,18 +47,21 @@ export function ReviewQueuePage() {
 }
 
 function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefined; onFilterChange: (filter: PostStatus | undefined) => void }) {
+  const cacheOwner = getStoredAdminAuth()?.user.id ?? 'anonymous'
+  const initialCacheKey = `admin:${cacheOwner}:posts:${filter ?? 'ALL'}:0`
+  const [cachedPage] = useState(() => readPageCache<MediaPage<PostResponse>>(initialCacheKey))
   const [page, setPage] = useState(0)
   const [refresh, setRefresh] = useState(0)
-  const [posts, setPosts] = useState<PostResponse[]>([])
-  const [last, setLast] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [posts, setPosts] = useState<PostResponse[]>(cachedPage?.content ?? [])
+  const [last, setLast] = useState(cachedPage?.last ?? false)
+  const [loading, setLoading] = useState(!cachedPage)
   const [loadError, setLoadError] = useState('')
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [reviewError, setReviewError] = useState<{ id: string; message: string } | null>(null)
   const [notice, setNotice] = useState('')
-  const hasLoadedRef = useRef(false)
+  const hasLoadedRef = useRef(Boolean(cachedPage))
 
   useEffect(() => {
     let active = true
@@ -66,6 +71,7 @@ function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefine
       setLast(result.last)
       setLoadError('')
       hasLoadedRef.current = true
+      writePageCache(`admin:${cacheOwner}:posts:${filter ?? 'ALL'}:${page}`, result)
     }).catch((cause: unknown) => {
       if (!active || hasLoadedRef.current) return
       setLoadError(cause instanceof ApiError && cause.status === 403
@@ -75,10 +81,15 @@ function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefine
       if (active) setLoading(false)
     })
     return () => { active = false }
-  }, [filter, page, refresh])
+  }, [cacheOwner, filter, page, refresh])
 
   function loadPage(nextPage: number) {
     setLoadError('')
+    const cached = readPageCache<MediaPage<PostResponse>>(`admin:${cacheOwner}:posts:${filter ?? 'ALL'}:${nextPage}`)
+    if (cached) {
+      setPosts(cached.content)
+      setLast(cached.last)
+    }
     if (nextPage === page) setRefresh((value) => value + 1)
     else setPage(nextPage)
   }
@@ -130,6 +141,11 @@ function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefine
             className={`${buttonClass} ${filter === value ? 'bg-[#24372C] text-white' : 'bg-white text-[#24372C] hover:bg-[#F1EEE7]'}`}
             onClick={() => {
               if (filter === value) return
+              const cached = readPageCache<MediaPage<PostResponse>>(`admin:${cacheOwner}:posts:${value ?? 'ALL'}:0`)
+              if (cached) {
+                setPosts(cached.content)
+                setLast(cached.last)
+              }
               setPage(0)
               setLoadError('')
               onFilterChange(value)
@@ -158,20 +174,17 @@ function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefine
               mediaCount: post.images.length,
             })
             return (
-              <article key={post.id} className="grid min-w-0 gap-4 rounded-2xl border border-[#D8D2C8] bg-white p-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-                {images.length > 0 && <PostImageCarousel images={images} className="overflow-hidden rounded-xl bg-[#F4F2ED] [--post-image-height:18rem] [--post-image-ratio:4/3]" />}
-                <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
+              <article key={post.id} className="mx-auto grid w-full max-w-[72rem] min-w-0 items-start gap-4 rounded-2xl border border-[#D8D2C8] bg-white p-3.5 md:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="min-w-0 md:col-span-2">
+                  <UploaderIdentity creator={post.creator} />
+                </div>
+                {images.length > 0 && <PostImageCarousel images={images} eager className="w-full self-start overflow-hidden rounded-xl border border-[#E7E2D9] bg-[#F4F2ED] [--post-image-height:260px] [--post-image-ratio:4/3]" />}
+                <div className="min-w-0 space-y-2.5 [overflow-wrap:anywhere]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="inline-block rounded-full bg-[#EEF1EF] px-2.5 py-1 text-xs font-bold text-[#24372C]">{post.postStatus ? statusLabels[post.postStatus] : 'Status unavailable'}</span>
-                    {post.creator && (
-                      <span className="text-xs font-bold text-[#355642]">
-                        by @{post.creator.username} {post.creator.firstName ? `(${post.creator.firstName})` : ''}
-                      </span>
-                    )}
+                    <span className="inline-block rounded-full bg-[#EEF1EF] px-2.5 py-0.5 text-xs font-bold text-[#24372C]">{post.postStatus ? statusLabels[post.postStatus] : 'Status unavailable'}</span>
                   </div>
-                  <h2 className="whitespace-pre-wrap text-base font-semibold">{post.caption || 'Untitled post'}</h2>
-                  {post.hashtags && <p className="text-sm font-semibold text-[#355642]">{post.hashtags}</p>}
-                  <p className="text-xs text-[#526157]">User ID {post.userId}</p>
+                  <h2 className="whitespace-pre-wrap text-sm font-semibold text-[#1C2820]">{post.caption || 'Untitled post'}</h2>
+                  {post.hashtags && <p className="text-xs font-semibold text-[#355642]">{post.hashtags}</p>}
 
                   {/* AI Content Monitoring & Safety Card */}
                   <AiModerationCard
@@ -179,44 +192,75 @@ function ReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefine
                     contentId={post.id}
                     contentType="POST"
                     onApplyRejectionReason={(autoReason) => {
-                      resetRejection()
                       setRejectingId(post.id)
                       setReason(autoReason)
                     }}
                   />
 
-                  {post.postStatus === 'REJECTED' && (
-                    <div className="rounded-lg bg-[#FFF4F2] p-3 text-sm text-[#842B24]">
-                      <p className="font-semibold">Rejection reason</p>
-                      <p className="mt-1 whitespace-pre-wrap">{post.rejectionReason?.trim() || 'No reason provided.'}</p>
+                  {/* Prominent Action Bar at Bottom of Card */}
+                  {rejectingId !== post.id && (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[#E3DFD5] bg-[#FAF8F5] p-2.5 shadow-2xs">
+                      <span className="text-xs font-medium text-[#526157]">Decision:</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {post.postStatus !== 'APPROVED' && (
+                          <button
+                            type="button"
+                            disabled={!!reviewingId}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => void review(post.id, { status: 'APPROVED' })}
+                          >
+                            <span>✓</span>
+                            <span>{reviewingId === post.id ? 'Approving…' : 'Approve (Okay)'}</span>
+                          </button>
+                        )}
+                        {post.postStatus !== 'REJECTED' && (
+                          <button
+                            type="button"
+                            disabled={!!reviewingId}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => {
+                              resetRejection()
+                              setRejectingId(post.id)
+                            }}
+                          >
+                            <span>✕</span>
+                            <span>Reject</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
-                  {rejectingId === post.id ? (
-                    <form className="grid gap-2" onSubmit={(event) => {
+
+                  {post.postStatus === 'REJECTED' && (
+                    <div className="rounded-lg bg-[#FFF4F2] p-2.5 text-xs text-[#842B24]">
+                      <p className="font-semibold">Rejection reason</p>
+                      <p className="mt-0.5 whitespace-pre-wrap">{post.rejectionReason?.trim() || 'No reason provided.'}</p>
+                    </div>
+                  )}
+
+                  {/* Compact Rejection Drawer - Only shown when Reject is clicked */}
+                  {rejectingId === post.id && (
+                    <form className="mt-2 grid gap-2 rounded-xl border border-rose-200 bg-rose-50/60 p-3" onSubmit={(event) => {
                       event.preventDefault()
                       void review(post.id, { status: 'REJECTED', rejectionReason: reason })
                     }}>
-                      <label className="grid gap-1 text-sm font-semibold">
-                        Rejection reason (required)
-                        <textarea value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={1000} rows={3} disabled={!!reviewingId}
-                          className="w-full rounded-lg border border-[#D8D2C8] px-3 py-2 text-base font-normal" />
-                      </label>
-                      <p className="text-xs text-[#526157]">The author will see this reason.</p>
+                      <div className="flex items-center justify-between text-xs font-semibold text-rose-900">
+                        <span>Rejection Reason (required)</span>
+                        <span className="text-[11px] text-rose-700 font-normal">Author will see this feedback</span>
+                      </div>
+                      <textarea value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={1000} rows={2} disabled={!!reviewingId}
+                        placeholder="State reason for rejecting this post..."
+                        className="w-full rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-normal text-stone-900 focus:border-rose-500 focus:outline-none" />
                       <div className="flex flex-wrap gap-2">
-                        <button type="submit" disabled={!reason.trim() || !!reviewingId} className={`${buttonClass} bg-[#842B24] text-white`}>{reviewingId === post.id ? 'Rejecting…' : 'Confirm rejection'}</button>
-                        <button type="button" disabled={!!reviewingId} className={buttonClass} onClick={resetRejection}>Cancel</button>
+                        <button type="submit" disabled={!reason.trim() || !!reviewingId} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-800 disabled:opacity-50">
+                          <span>✕</span>
+                          <span>{reviewingId === post.id ? 'Rejecting…' : 'Confirm Rejection'}</span>
+                        </button>
+                        <button type="button" disabled={!!reviewingId} className="rounded-lg border border-[#D8D2C8] bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-[#F1EEE7]" onClick={resetRejection}>Cancel</button>
                       </div>
                     </form>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {post.postStatus !== 'APPROVED' && <button type="button" disabled={!!reviewingId} className={`${buttonClass} bg-[#24372C] text-white enabled:hover:bg-[#355642]`} onClick={() => void review(post.id, { status: 'APPROVED' })}>{reviewingId === post.id ? 'Approving…' : 'Approve'}</button>}
-                      {post.postStatus !== 'REJECTED' && <button type="button" disabled={!!reviewingId} className={`${buttonClass} text-[#842B24] enabled:hover:bg-[#FFF4F2]`} onClick={() => {
-                        resetRejection()
-                        setRejectingId(post.id)
-                      }}>Reject</button>}
-                    </div>
                   )}
-                  {reviewError?.id === post.id && <p role="alert" className="text-sm text-[#842B24]">{reviewError.message}</p>}
+                  {reviewError?.id === post.id && <p role="alert" className="text-xs text-[#842B24]">{reviewError.message}</p>}
                 </div>
               </article>
             )

@@ -152,15 +152,17 @@ export default function RegisterPage() {
     }
 
     const cleanPhone = form.phone.replace(/\D/g, '')
-    const cleanCode = form.countryCode.replace(/\D/g, '')
-    if (!cleanCode) {
-      errs.phone = 'Country code is required (e.g. +91).'
+    const countryCode = form.countryCode.trim()
+    if (!/^\+[1-9]\d{0,3}$/.test(countryCode)) {
+      errs.phone = 'Use a valid country code: + followed by 1–4 digits, for example +91.'
     } else if (!cleanPhone) {
       errs.phone = 'Mobile number is required.'
-    } else if (cleanCode === '91' && cleanPhone.length !== 10) {
-      errs.phone = 'Indian mobile number must be 10 digits.'
-    } else if (cleanPhone.length < 6 || cleanPhone.length > 15) {
-      errs.phone = 'Enter a valid mobile number (6–15 digits).'
+    } else if (!/^\d{6,14}$/.test(cleanPhone)) {
+      errs.phone = 'Mobile number must contain 6–14 digits only.'
+    } else if (/^(\d)\1+$/.test(cleanPhone)) {
+      errs.phone = 'Enter a real mobile number; repeated digits are not valid.'
+    } else if (countryCode === '+91' && !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errs.phone = 'Indian mobile numbers must have 10 digits and start with 6, 7, 8, or 9.'
     }
 
     if (!form.password) {
@@ -497,9 +499,8 @@ export default function RegisterPage() {
                       list="country-codes"
                       value={form.countryCode}
                       onChange={(e) => {
-                        let val = e.target.value.trim()
-                        if (!val.startsWith('+') && val.length > 0 && !isNaN(Number(val))) val = '+' + val
-                        update('countryCode', val.slice(0, 5))
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 4)
+                        update('countryCode', digits ? `+${digits}` : '')
                       }}
                       placeholder="+91"
                       className="h-full w-16 shrink-0 border-r border-[#DCE0DD] bg-[#F4F1EA] text-center text-xs sm:text-sm font-bold text-[#24372C] outline-none"
@@ -516,9 +517,14 @@ export default function RegisterPage() {
                       <option value="+60">Malaysia (+60)</option>
                     </datalist>
                     <input
+                      type="tel"
                       inputMode="numeric"
+                      autoComplete="tel-national"
+                      minLength={6}
+                      maxLength={14}
+                      pattern="[0-9]{6,14}"
                       value={form.phone}
-                      onChange={(e) => update('phone', e.target.value.replace(/\D/g, '').slice(0, 15))}
+                      onChange={(e) => update('phone', e.target.value.replace(/\D/g, '').slice(0, 14))}
                       placeholder="Mobile number"
                       className="h-full flex-1 bg-transparent px-3 text-[14px] text-[#24372C] placeholder:text-[#24372C]/40 outline-none"
                     />

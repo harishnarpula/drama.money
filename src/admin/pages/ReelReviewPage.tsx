@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, ApiError } from '../../services/api'
-import type { ContentReviewDecision, PostStatus, ReelResponse } from '../../services/api'
+import { api, ApiError, getStoredAdminAuth } from '../../services/api'
+import type { ContentReviewDecision, MediaPage, PostStatus, ReelResponse } from '../../services/api'
+import { readPageCache, writePageCache } from '../../services/pageCache'
 import { AdminPage } from '../components/AdminPageUI'
 import { generateAiReviewReport } from '../../services/aiModerator'
 import { AiModerationCard } from '../components/AiModerationCard'
+import { UploaderIdentity } from '../components/UploaderIdentity'
 
 const filters = [
   { label: 'Pending', value: 'PENDING' },
@@ -25,18 +27,21 @@ export function ReelReviewPage() {
 }
 
 function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | undefined; onFilterChange: (filter: PostStatus | undefined) => void }) {
+  const cacheOwner = getStoredAdminAuth()?.user.id ?? 'anonymous'
+  const initialCacheKey = `admin:${cacheOwner}:reels:${filter ?? 'ALL'}:0`
+  const [cachedPage] = useState(() => readPageCache<MediaPage<ReelResponse>>(initialCacheKey))
   const [page, setPage] = useState(0)
   const [refresh, setRefresh] = useState(0)
-  const [reels, setReels] = useState<ReelResponse[]>([])
-  const [last, setLast] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [reels, setReels] = useState<ReelResponse[]>(cachedPage?.content ?? [])
+  const [last, setLast] = useState(cachedPage?.last ?? false)
+  const [loading, setLoading] = useState(!cachedPage)
   const [loadError, setLoadError] = useState('')
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [reviewError, setReviewError] = useState<{ id: string; message: string } | null>(null)
   const [notice, setNotice] = useState('')
-  const hasLoadedRef = useRef(false)
+  const hasLoadedRef = useRef(Boolean(cachedPage))
 
   useEffect(() => {
     let active = true
@@ -46,6 +51,7 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
       setLast(result.last)
       setLoadError('')
       hasLoadedRef.current = true
+      writePageCache(`admin:${cacheOwner}:reels:${filter ?? 'ALL'}:${page}`, result)
     }).catch((cause: unknown) => {
       if (!active || hasLoadedRef.current) return
       setLoadError(cause instanceof ApiError && cause.status === 403
@@ -55,10 +61,15 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
       if (active) setLoading(false)
     })
     return () => { active = false }
-  }, [filter, page, refresh])
+  }, [cacheOwner, filter, page, refresh])
 
   function loadPage(nextPage: number) {
     setLoadError('')
+    const cached = readPageCache<MediaPage<ReelResponse>>(`admin:${cacheOwner}:reels:${filter ?? 'ALL'}:${nextPage}`)
+    if (cached) {
+      setReels(cached.content)
+      setLast(cached.last)
+    }
     if (nextPage === page) setRefresh((value) => value + 1)
     else setPage(nextPage)
   }
@@ -110,6 +121,11 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
             className={`${buttonClass} ${filter === value ? 'bg-[#24372C] text-white' : 'bg-white text-[#24372C] hover:bg-[#F1EEE7]'}`}
             onClick={() => {
               if (filter === value) return
+              const cached = readPageCache<MediaPage<ReelResponse>>(`admin:${cacheOwner}:reels:${value ?? 'ALL'}:0`)
+              if (cached) {
+                setReels(cached.content)
+                setLast(cached.last)
+              }
               setPage(0)
               setLoadError('')
               onFilterChange(value)
@@ -140,66 +156,97 @@ function ReelReviewQueue({ filter, onFilterChange }: { filter: PostStatus | unde
               hasVideo: !!reel.videoUrl,
             })
             return (
-              <article key={reel.id} className="grid min-w-0 gap-4 rounded-2xl border border-[#D8D2C8] bg-white p-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-                <video controls preload="metadata" poster={reel.coverUrl || undefined} src={reel.videoUrl} className="max-h-[28rem] w-full rounded-xl bg-[#172D25] object-contain" aria-label="Reel submitted for review" />
-                <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
+              <article key={reel.id} className="mx-auto grid w-full max-w-[72rem] min-w-0 items-start gap-4 rounded-2xl border border-[#D8D2C8] bg-white p-3.5 md:grid-cols-[190px_minmax(0,1fr)]">
+                <div className="min-w-0 md:col-span-2">
+                  <UploaderIdentity creator={reel.creator} />
+                </div>
+                {/* Compact Reel Player */}
+                <div className="flex justify-center rounded-xl border border-[#E1DDD4] bg-[#172D25] p-1.5 w-[190px] mx-auto md:mx-0">
+                  <video controls preload="metadata" poster={reel.coverUrl || undefined} src={reel.videoUrl} className="aspect-[9/16] h-[300px] w-auto rounded-lg bg-black object-contain" aria-label="Reel submitted for review" />
+                </div>
+                <div className="min-w-0 space-y-2.5 [overflow-wrap:anywhere]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="inline-block rounded-full bg-[#EEF1EF] px-2.5 py-1 text-xs font-bold text-[#24372C]">{reel.reelStatus ? statusLabels[reel.reelStatus] : 'Status unavailable'}</span>
-                    {reel.creator && (
-                      <span className="text-xs font-bold text-[#355642]">
-                        by @{reel.creator.username} {reel.creator.firstName ? `(${reel.creator.firstName})` : ''}
-                      </span>
-                    )}
+                    <span className="inline-block rounded-full bg-[#EEF1EF] px-2.5 py-0.5 text-xs font-bold text-[#24372C]">{reel.reelStatus ? statusLabels[reel.reelStatus] : 'Status unavailable'}</span>
                   </div>
-                  <h2 className="whitespace-pre-wrap text-base font-semibold">{reel.caption || 'Untitled reel'}</h2>
-                  {reel.hashtags && <p className="text-sm font-semibold text-[#355642]">{reel.hashtags}</p>}
-                  <p className="text-xs text-[#526157]">User ID {reel.userId}</p>
+                  <h2 className="whitespace-pre-wrap text-sm font-semibold text-[#1C2820]">{reel.caption || 'Untitled reel'}</h2>
+                  {reel.hashtags && <p className="text-xs font-semibold text-[#355642]">{reel.hashtags}</p>}
 
-                  {/* AI Content Monitoring & Safety Card */}
+                  {/* AI Content Monitoring & Safety Card (Score + Type + Summary) */}
                   <AiModerationCard
                     report={aiReport}
                     contentId={reel.id}
                     contentType="REEL"
                     onApplyRejectionReason={(autoReason) => {
-                      resetRejection()
                       setRejectingId(reel.id)
                       setReason(autoReason)
                     }}
                   />
 
-                  {reel.reelStatus === 'REJECTED' && (
-                  <div className="rounded-lg bg-[#FFF4F2] p-3 text-sm text-[#842B24]">
-                    <p className="font-semibold">Rejection reason</p>
-                    <p className="mt-1 whitespace-pre-wrap">{reel.rejectionReason?.trim() || 'No reason provided.'}</p>
-                  </div>
-                )}
-                {rejectingId === reel.id ? (
-                  <form className="grid gap-2" onSubmit={(event) => {
-                    event.preventDefault()
-                    void review(reel.id, { status: 'REJECTED', rejectionReason: reason })
-                  }}>
-                    <label className="grid gap-1 text-sm font-semibold">
-                      Rejection reason (required)
-                      <textarea value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={1000} rows={3} disabled={!!reviewingId}
-                        className="w-full rounded-lg border border-[#D8D2C8] px-3 py-2 text-base font-normal" />
-                    </label>
-                    <p className="text-xs text-[#526157]">The author will see this reason.</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="submit" disabled={!reason.trim() || !!reviewingId} className={`${buttonClass} bg-[#842B24] text-white`}>{reviewingId === reel.id ? 'Rejecting…' : 'Confirm rejection'}</button>
-                      <button type="button" disabled={!!reviewingId} className={buttonClass} onClick={resetRejection}>Cancel</button>
+                  {/* Prominent Action Bar at Bottom of Card */}
+                  {rejectingId !== reel.id && (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[#E3DFD5] bg-[#FAF8F5] p-2.5 shadow-2xs">
+                      <span className="text-xs font-medium text-[#526157]">Decision:</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {reel.reelStatus !== 'APPROVED' && (
+                          <button
+                            type="button"
+                            disabled={!!reviewingId}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => void review(reel.id, { status: 'APPROVED' })}
+                          >
+                            <span>✓</span>
+                            <span>{reviewingId === reel.id ? 'Approving…' : 'Approve (Okay)'}</span>
+                          </button>
+                        )}
+                        {reel.reelStatus !== 'REJECTED' && (
+                          <button
+                            type="button"
+                            disabled={!!reviewingId}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => {
+                              resetRejection()
+                              setRejectingId(reel.id)
+                            }}
+                          >
+                            <span>✕</span>
+                            <span>Reject</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </form>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {reel.reelStatus !== 'APPROVED' && <button type="button" disabled={!!reviewingId} className={`${buttonClass} bg-[#24372C] text-white enabled:hover:bg-[#355642]`} onClick={() => void review(reel.id, { status: 'APPROVED' })}>{reviewingId === reel.id ? 'Approving…' : 'Approve'}</button>}
-                    {reel.reelStatus !== 'REJECTED' && <button type="button" disabled={!!reviewingId} className={`${buttonClass} text-[#842B24] enabled:hover:bg-[#FFF4F2]`} onClick={() => {
-                      resetRejection()
-                      setRejectingId(reel.id)
-                    }}>Reject</button>}
-                  </div>
-                )}
-                {reviewError?.id === reel.id && <p role="alert" className="text-sm text-[#842B24]">{reviewError.message}</p>}
-              </div>
+                  )}
+
+                  {reel.reelStatus === 'REJECTED' && (
+                    <div className="rounded-lg bg-[#FFF4F2] p-2.5 text-xs text-[#842B24]">
+                      <p className="font-semibold">Rejection reason</p>
+                      <p className="mt-0.5 whitespace-pre-wrap">{reel.rejectionReason?.trim() || 'No reason provided.'}</p>
+                    </div>
+                  )}
+
+                  {/* Compact Rejection Drawer - Only shown when Reject is clicked */}
+                  {rejectingId === reel.id && (
+                    <form className="mt-2 grid gap-2 rounded-xl border border-rose-200 bg-rose-50/60 p-3" onSubmit={(event) => {
+                      event.preventDefault()
+                      void review(reel.id, { status: 'REJECTED', rejectionReason: reason })
+                    }}>
+                      <div className="flex items-center justify-between text-xs font-semibold text-rose-900">
+                        <span>Rejection Reason (required)</span>
+                        <span className="text-[11px] text-rose-700 font-normal">Author will see this feedback</span>
+                      </div>
+                      <textarea value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={1000} rows={2} disabled={!!reviewingId}
+                        placeholder="State reason for rejecting this reel..."
+                        className="w-full rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-normal text-stone-900 focus:border-rose-500 focus:outline-none" />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="submit" disabled={!reason.trim() || !!reviewingId} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-800 disabled:opacity-50">
+                          <span>✕</span>
+                          <span>{reviewingId === reel.id ? 'Rejecting…' : 'Confirm Rejection'}</span>
+                        </button>
+                        <button type="button" disabled={!!reviewingId} className="rounded-lg border border-[#D8D2C8] bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-[#F1EEE7]" onClick={resetRejection}>Cancel</button>
+                      </div>
+                    </form>
+                  )}
+                  {reviewError?.id === reel.id && <p role="alert" className="text-xs text-[#842B24]">{reviewError.message}</p>}
+                </div>
             </article>
           )
         })}

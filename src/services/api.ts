@@ -21,6 +21,7 @@ export interface CreatePostRequest {
 }
 
 export type PostStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type FollowStatus = 'FOLLOWING' | 'FOLLOWED_BY'
 
 export type ContentReviewDecision = { status: 'APPROVED' } | { status: 'REJECTED'; rejectionReason: string }
 
@@ -30,6 +31,15 @@ export interface ContentCreator {
   userId: string
   firstName?: string
   lastName?: string
+  username: string
+  profileUrl?: string | null
+  followStatus?: FollowStatus | null
+}
+
+export interface UserSearchResult {
+  userId: string
+  firstName?: string | null
+  lastName?: string | null
   username: string
   profileUrl?: string | null
 }
@@ -797,6 +807,16 @@ export const api = {
     },
   },
   users: {
+    search: (query: string, page = 0, size = 20) => {
+      const params = new URLSearchParams({ query, page: String(page), size: String(size) })
+      return request<MediaPage<UserSearchResult>>(`/api/users/search?${params}`, { auth: true })
+    },
+    getProfile: (userId: string) =>
+      request<ContentCreator>(`/api/users/view-profile/${encodeURIComponent(userId)}`, { auth: true }),
+    follow: (userId: string) =>
+      request<void>(`/api/users/${encodeURIComponent(userId)}/follow`, { method: 'PUT', auth: true }),
+    unfollow: (userId: string) =>
+      request<void>(`/api/users/${encodeURIComponent(userId)}/un-follow`, { method: 'DELETE', auth: true }),
     uploadProfileImage: (file: File) => {
       const body = new FormData()
       body.append('file', file)

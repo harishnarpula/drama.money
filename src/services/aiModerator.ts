@@ -192,9 +192,17 @@ export function generateAiReviewReport(input: {
   }
 
   // 5. Generate Crisp AI Summary
-  const summary = caption
-    ? `Provides guidance on ${detectedCategory.toLowerCase()}: "${caption.split(/[.?!]\s/)[0].trim()}". Appropriate for Telugu youth seeking career growth.`
-    : `A short visual guide focused on ${detectedCategory.toLowerCase()}.`
+  let summary: string
+  if (caption) {
+    const cleanCaption = caption.replace(/#[\w\u0C00-\u0C7F]+/g, '').replace(/\s+/g, ' ').trim()
+    if (cleanCaption.length > 0) {
+      summary = cleanCaption.length > 160 ? cleanCaption.slice(0, 160).trim() + '…' : cleanCaption
+    } else {
+      summary = `Visual ${input.contentType === 'REEL' ? 'video reel' : 'post'} categorized under ${detectedCategory.toLowerCase()}.`
+    }
+  } else {
+    summary = `Visual ${input.contentType === 'REEL' ? 'video reel' : 'post'} categorized under ${detectedCategory.toLowerCase()}.`
+  }
 
   // 6. Extracted tags
   const tags = [
