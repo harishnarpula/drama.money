@@ -915,6 +915,7 @@ export default function LandingPage() {
           <Brand to="/" />
           <nav aria-label="Footer navigation" className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             {navLinks.map(([id, label]) => <a key={id} href={'#' + id} onClick={(e) => goToSection(e, id)} className="text-sm! font-medium! text-[#24372C]/65! transition-colors hover:text-[#24372C]!">{label}</a>)}
+            <Link to="/privacy" className="text-sm! font-medium! text-[#24372C]/65! transition-colors hover:text-[#24372C]!">Privacy</Link>
           </nav>
           <span className="text-xs text-[#24372C]/55">© 2026 Drama.Money · Jobs &amp; skills only</span>
         </div>

@@ -316,7 +316,7 @@ export default function LoginPage() {
 
           <Rise show={ready} delay={320}>
             <p className="mt-[clamp(10px,2vh,22px)] text-center text-[14px] text-[#24372C]/65">New to Drama.Money? <Link to="/register" className="font-semibold! text-[#24372C]! underline-offset-4 hover:underline">Create an account</Link></p>
-            <p className="mt-[clamp(4px,1vh,10px)] text-center text-[11px] text-[#24372C]/45">By continuing, you agree to the Terms and Privacy Policy.</p>
+            <p className="mt-[clamp(4px,1vh,10px)] text-center text-[11px] text-[#24372C]/45">By continuing, you agree to the Terms and <Link to="/privacy" className="font-semibold! text-[#24372C]/65! underline underline-offset-2 hover:text-[#24372C]!">Privacy Policy</Link>.</p>
           </Rise>
         </div>
 

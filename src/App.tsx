@@ -15,6 +15,7 @@ import { SessionExpiredModal } from './components/SessionExpiredModal'
 import dramaIcon from './assets/dramaIcon.png'
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'))
 const AdminApp = lazy(() => import('./admin/AdminApp'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]" aria-label="Loading Drama.Money 3D experience"><img src={dramaIcon} alt="" className="h-[72px] w-auto motion-safe:animate-pulse" /></div>}><LandingPage /></Suspense>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/privacy" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]" aria-label="Loading privacy policy"><img src={dramaIcon} alt="" className="h-[72px] w-auto motion-safe:animate-pulse" /></div>}><PrivacyPolicyPage /></Suspense>} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/admin/*" element={<Suspense fallback={<div className="grid min-h-dvh place-items-center bg-[#F8F6F1]"><img src={dramaIcon} alt="" className="h-[72px] w-auto motion-safe:animate-pulse" /></div>}><AdminApp /></Suspense>} />
       <Route path="/app" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>

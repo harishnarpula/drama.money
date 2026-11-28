@@ -701,7 +701,7 @@ export default function RegisterPage() {
                 />
                 <span>
                   I confirm that I am aged 18–24 and agree to the <strong>Terms of Service</strong> and{' '}
-                  <strong>Privacy Policy</strong>.
+                  <Link to="/privacy" className="font-bold text-[#24372C] underline underline-offset-2" target="_blank" rel="noreferrer">Privacy Policy</Link>.
                 </span>
               </label>
               {fieldErrors.accepted && (

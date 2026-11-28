@@ -326,7 +326,7 @@ export default function AdminLoginPage() {
         <footer className="flex shrink-0 items-center justify-between gap-3 text-[11px] text-[#24372C]/45">
           <span>© 2026 Drama.Money</span>
           <span className="hidden sm:inline-flex gap-3">
-            <a href="#privacy" className="text-[#24372C]/45! hover:text-[#24372C]!">Privacy</a>
+            <a href="/privacy" className="text-[#24372C]/45! hover:text-[#24372C]!">Privacy</a>
             <a href="#security" className="text-[#24372C]/45! hover:text-[#24372C]!">Security</a>
             <a href="mailto:support@drama.money" className="text-[#24372C]/45! hover:text-[#24372C]!">Support</a>
           </span>
